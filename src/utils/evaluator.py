@@ -19,6 +19,7 @@ class Model:
         self.item_embed = np.load(f'../logs/{model_name}/embeds/item_embed.npy')
         self.user_bias = np.load(f'../logs/{model_name}/embeds/user_bias.npy')
         self.item_bias = np.load(f'../logs/{model_name}/embeds/item_bias.npy')
+        self.model_name = model_name
 
     def predict(self, users: np.array, items: np.array) -> np.array:
         """Predict scores for each user-item pairs."""
