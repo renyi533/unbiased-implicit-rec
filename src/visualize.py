@@ -11,8 +11,8 @@ from plotly.graph_objs import Figure, Layout, Scatter
 from plotly.offline import plot
 
 metrics = ['DCG', 'Recall', 'MAP']
-models = ['oracle', 'mf', 'rmf']
-names = ['Oracle', 'Naive', 'Unbiased']
+models = ['oracle', 'mf', 'rmf', 'bpr', 'ubpr', 'ipwbpr', 'ipwbpr_opt0', 'ipwbpr_opt1', 'ipwbpr_opt2', 'ipwbpr_opt3']
+names = ['Oracle', 'mf', 'rmf', 'bpr', 'ubpr', 'ipwbpr', 'ipwbpr_opt0', 'ipwbpr_opt1', 'ipwbpr_opt2', 'ipwbpr_opt3']
 colors = ['rgb(31, 119, 180)', 'rgb(255, 127, 14)',
           'rgb(44, 160, 44)', 'rgb(214, 39, 40)',
           'rgb(148, 103, 189)', 'rgb(140, 86, 75)',

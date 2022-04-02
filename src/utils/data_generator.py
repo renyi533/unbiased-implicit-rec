@@ -32,7 +32,7 @@ def load_movielens(seed: int = 0) -> Tuple[np.array, int, int]:
     return data, num_users, num_items
 
 
-def generate_sys_data(eps: float = 5, pow: float = 0.5) -> np.ndarray:
+def generate_sys_data(eps: float = 5, pow: float = 0.5, enable_ips: bool = False, neg_num: int = 10) -> np.ndarray:
     """Generate semi-synthetic data from ml-100k dataset.
 
     return:
@@ -107,10 +107,21 @@ def generate_sys_data(eps: float = 5, pow: float = 0.5) -> np.ndarray:
     y_obs = expo_ * y_
     sys_data = np.c_[data_, y_obs, expo_, y_, theta_, gamma_]
     np.save(file=path / f'eps_{eps}_pow_{pow}.npy', arr=sys_data)
+    df = pd.DataFrame(sys_data, columns=['user', 'item', 'click', 'exposure', 'relevance', 'theta', 'gamma'])
 
-    return sys_data
+    positive = df.query("click == 1")
+    negative = df if enable_ips else df.query("click == 0")
+    ret = positive.merge(negative, on="user")\
+        .sample(frac=1, random_state=12345)\
+        .groupby(["user", "item_x"])\
+        .head(neg_num)
+
+    sys_pair_data = ret[['user', 'item_x', 'item_y', 'click_x', 'click_y', 'exposure_x', 'exposure_y', 'relevance_x', 'relevance_y', 'theta_x', 'theta_y', 'gamma_x', 'gamma_y']].values
+    np.save(file=path / f'pair_eps_{eps}_pow_{pow}.npy', arr=sys_pair_data)
+    return sys_data, sys_pair_data
 
 
 def sigmoid(x: np.ndarray) -> np.ndarray:
     """Calculate sigmoid."""
     return 1 / (1 + np.exp(-x))
+
