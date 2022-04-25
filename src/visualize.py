@@ -11,19 +11,19 @@ from plotly.graph_objs import Figure, Layout, Scatter
 from plotly.offline import plot
 
 metrics = ['DCG', 'Recall', 'MAP']
-models = ['oracle', 'mf', 'rmf', 'bpr', 'ubpr', 'ipwbpr', 'ipwbpr_opt0', 'ipwbpr_opt1', 'ipwbpr_opt2', 'ipwbpr_opt3']
-names = ['Oracle', 'mf', 'rmf', 'bpr', 'ubpr', 'ipwbpr', 'ipwbpr_opt0', 'ipwbpr_opt1', 'ipwbpr_opt2', 'ipwbpr_opt3']
+models = ['oracle', 'mf', 'rmf', 'bpr', 'ubpr', 'ipwbpr', 'ipwbpr_opt0', 'ipwbpr_opt1', 'ipwbpr_opt2', 'ipwbpr_opt3', 'ubpr_nclip']
+names = ['Oracle', 'mf', 'rmf', 'bpr', 'ubpr', 'ipwbpr', 'ipwbpr_opt0', 'ipwbpr_opt1', 'ipwbpr_opt2', 'ipwbpr_opt3', 'ubpr_nclip']
 colors = ['rgb(31, 119, 180)', 'rgb(255, 127, 14)',
           'rgb(44, 160, 44)', 'rgb(214, 39, 40)',
           'rgb(148, 103, 189)', 'rgb(140, 86, 75)',
           'rgb(227, 119, 194)', 'rgb(127, 127, 127)',
-          'rgb(188, 189, 34)', 'rgb(23, 190, 207)']
+          'rgb(188, 189, 34)', 'rgb(23, 190, 207)', 'rgb(0, 0, 0)']
 
 fill_colors = ['rgba(31, 119, 180, 0.2)', 'rgba(255, 127, 14, 0.2)',
                'rgba(44, 160, 44, 0.2)', 'rgba(214, 39, 40, 0.2)',
                'rgba(148, 103, 189, 0.2)', 'rgba(140, 86, 75, 0.2)',
                'rgba(227, 119, 194, 0.2)', 'rgba(127, 127, 127, 0.2)',
-               'rgba(188, 189, 34, 0.2)', 'rgba(23, 190, 207, 0.2)']
+               'rgba(188, 189, 34, 0.2)', 'rgba(23, 190, 207, 0.2)', 'rgba(0, 0, 0, 0.2)']
 
 
 @dataclass
@@ -118,7 +118,7 @@ layout_rel_pred = Layout(
     yaxis=dict(title='relative log loss', range=[0.95, 1.6], titlefont=dict(
         size=30), tickfont=dict(size=18), gridcolor='rgb(255,255,255)'),
     legend=dict(bgcolor='rgb(245,245,245)', x=0.99, xanchor='right',
-                        orientation='h', y=0.99, yanchor='top', font=dict(size=30)),
+                        orientation='h', y=0.99, yanchor='top', font=dict(size=10)),
     margin=dict(l=80, t=50, b=60))
 
 
@@ -131,7 +131,7 @@ layout_overall_results = Layout(
                tickfont=dict(size=20), gridcolor='rgb(255,255,255)'),
     yaxis=dict(tickfont=dict(size=15), gridcolor='rgb(255,255,255)'),
     legend=dict(bgcolor='rgb(245,245,245)', x=0.01, xanchor='left',
-                orientation='h', y=0.99, yanchor='top', font=dict(size=32)),
+                orientation='h', y=0.99, yanchor='top', font=dict(size=10)),
     margin=dict(l=50, t=50, b=60))
 
 layout_test_curves = Layout(
@@ -142,7 +142,7 @@ layout_test_curves = Layout(
     yaxis=dict(title='log loss', titlefont=dict(size=30),
                tickfont=dict(size=18), gridcolor='rgb(255,255,255)'),
     legend=dict(bgcolor='rgb(245,245,245)', x=0.99, xanchor='right',
-                orientation='h', y=0.99, yanchor='top', font=dict(size=30)),
+                orientation='h', y=0.99, yanchor='top', font=dict(size=10)),
     margin=dict(l=80, t=50, b=60))
 
 

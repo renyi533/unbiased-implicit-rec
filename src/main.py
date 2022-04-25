@@ -10,7 +10,7 @@ with open('./conf/params.yaml', 'rb') as f:
     conf = yaml.safe_load(f)['model_params']
 
 parser = argparse.ArgumentParser()
-parser.add_argument('model_name', type=str, choices=['oracle', 'mf', 'rmf', 'bpr', 'ubpr', 'ipwbpr', 'ipwbpr_opt0', 'ipwbpr_opt1', 'ipwbpr_opt2', 'ipwbpr_opt3'])
+parser.add_argument('model_name', type=str, choices=['oracle', 'mf', 'rmf', 'bpr', 'ubpr', 'ipwbpr', 'ipwbpr_opt0', 'ipwbpr_opt1', 'ipwbpr_opt2', 'ipwbpr_opt3', 'ubpr_nclip'])
 parser.add_argument('--optimizer', type=str, default='sgd', choices=['adam', 'sgd'])
 parser.add_argument('--eps', default=5., type=float)
 parser.add_argument('--pow_list', default=[1.], type=float, nargs='*')

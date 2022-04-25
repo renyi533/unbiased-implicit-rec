@@ -181,10 +181,10 @@ class Trainer:
         results = []
         for pow in pow_list:
             # generate semi-synthetic data
-            ips = self.model_name == 'ubpr' or self.model_name == 'rmf' or 'ipwbpr' in self.model_name
+            ips = 'ubpr' in self.model_name or self.model_name == 'rmf' or 'ipwbpr' in self.model_name
             data, pair_data = generate_sys_data(eps=eps, pow=pow, enable_ips=ips)
             
-            if self.model_name == 'bpr' or self.model_name == 'ubpr' or 'ipwbpr' in self.model_name:
+            if self.model_name == 'bpr' or 'ubpr' in self.model_name or 'ipwbpr' in self.model_name:
                 num_users = np.int(data[:, 0].max() + 1)
                 num_items = np.int(data[:, 1].max() + 1)
                 # data splitting

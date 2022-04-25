@@ -16,6 +16,15 @@ mf:
   pair_weight: 0
   norm_weight: True
   beta: 0.0
+rmf:
+  dim: 10
+  lam: 0.00001
+  eta: 0.1
+  max_iters: 1000
+  batch_size: 12
+  pair_weight: 0
+  norm_weight: True
+  beta: 0.0
 oracle:
   dim: 10
   lam: 0.00001
@@ -43,6 +52,15 @@ ubpr:
   pair_weight: 0
   norm_weight: True
   beta: 0.0
+ubpr_nclip:
+  dim: 10
+  lam: 0.00001
+  eta: 0.1
+  max_iters: 1000
+  batch_size: 12
+  pair_weight: 0
+  norm_weight: True
+  beta: 100000000.0
 ipwbpr:
   dim: 10
   lam: 0.00001
