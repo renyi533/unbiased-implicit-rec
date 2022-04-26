@@ -71,7 +71,7 @@ def rec_trainer(sess: tf.Session, model: ImplicitRecommender,
     return test_loss_list[np.argmin(val_loss_list)]
 
 def pairwise_rec_trainer(sess: tf.Session, model: PairwiseRecommender,
-                train: np.ndarray, val: np.ndarray, test: np.ndarray,
+                train: np.ndarray, val: np.ndarray, test: np.ndarray, point_train: np.ndarray,
                 max_iters: int = 500, batch_size: int = 2**12, model_name: str = 'bpr',
                 eps: float = 5, pow: float = 1.0, num: int = 0) -> float:
     """Train and Evaluate Implicit Recommender."""
@@ -83,6 +83,7 @@ def pairwise_rec_trainer(sess: tf.Session, model: PairwiseRecommender,
     sess.run(init_op)
     # count the num of train-val data.
     num_train = train.shape[0]
+    num_point_train = point_train.shape[0]
     num_val = val.shape[0]
     # specify model type.
     ips = 'ubpr' in model_name or 'ipwbpr' in model_name
@@ -99,6 +100,7 @@ def pairwise_rec_trainer(sess: tf.Session, model: PairwiseRecommender,
                                           model.pos_items: train_batch[:, 1],
                                           model.scores1: np.ones((batch_size, 1)),
                                           model.items2: train_batch[:, 2],
+                                          model.labels1: np.ones((batch_size, 1)),
                                           model.labels2: np.zeros((batch_size, 1)),
                                           model.scores2: np.ones((batch_size, 1))})
         else:
@@ -107,8 +109,21 @@ def pairwise_rec_trainer(sess: tf.Session, model: PairwiseRecommender,
                                           model.pos_items: train_batch[:, 1],
                                           model.scores1: np.expand_dims(train_batch[:, 9], 1),
                                           model.items2: train_batch[:, 2],
+                                          model.labels1: np.expand_dims(train_batch[:, 3], 1),
                                           model.labels2: np.expand_dims(train_batch[:, 4], 1),
                                           model.scores2: np.expand_dims(train_batch[:, 10], 1)})
+            if model.apply_point_grads is not None:
+                print('apply_point_grads')
+                idx = np.random.choice(np.arange(num_point_train), size=batch_size)
+                train_batch = point_train[idx]
+                _, point_loss = sess.run([model.apply_point_grads, model.point_loss],
+                                   feed_dict={model.users: train_batch[:, 0],
+                                              model.pos_items: train_batch[:, 1],
+                                              model.scores1: np.expand_dims(train_batch[:, 9], 1),
+                                              model.items2: train_batch[:, 2],
+                                              model.labels1: np.expand_dims(train_batch[:, 3], 1),
+                                              model.labels2: np.expand_dims(train_batch[:, 4], 1),
+                                              model.scores2: np.expand_dims(train_batch[:, 10], 1)})
         train_loss_list.append(loss)
         #print('finished train of %d iter' % (i))
         # calculate a test loss
@@ -127,6 +142,7 @@ def pairwise_rec_trainer(sess: tf.Session, model: PairwiseRecommender,
                                        model.pos_items: val[:, 1],
                                        model.scores1: np.ones((num_val, 1)),
                                        model.items2: val[:, 2],
+                                       model.labels1: np.ones((num_val, 1)),
                                        model.labels2: np.zeros((num_val, 1)),
                                        model.scores2: np.ones((num_val, 1))})
         else:
@@ -135,6 +151,7 @@ def pairwise_rec_trainer(sess: tf.Session, model: PairwiseRecommender,
                                        model.pos_items: val[:, 1],
                                        model.scores1: np.expand_dims(val[:, 9], 1),
                                        model.items2: val[:, 2],
+                                       model.labels1: np.expand_dims(val[:, 3], 1),
                                        model.labels2: np.expand_dims(val[:, 4], 1),
                                        model.scores2: np.expand_dims(val[:, 10], 1)})
         val_loss_list.append(val_loss)
@@ -182,7 +199,13 @@ class Trainer:
         for pow in pow_list:
             # generate semi-synthetic data
             ips = 'ubpr' in self.model_name or self.model_name == 'rmf' or 'ipwbpr' in self.model_name
-            data, pair_data = generate_sys_data(eps=eps, pow=pow, enable_ips=ips)
+            pair_type = 0
+            if 'ubpr' in self.model_name:
+                pair_type = 1
+            elif 'ipwbpr' in self.model_name:
+                pair_type = 2
+
+            data, pair_data, dummy_pair_data = generate_sys_data(eps=eps, pow=pow, pair_type=pair_type)
             
             if self.model_name == 'bpr' or 'ubpr' in self.model_name or 'ipwbpr' in self.model_name:
                 num_users = np.int(data[:, 0].max() + 1)
@@ -208,7 +231,7 @@ class Trainer:
                                             dim=self.dim, lam=self.lam, eta=self.eta, beta=self.beta,
                                             optimizer=self.optimizer)
                     # train and evaluate the recommender
-                    score = pairwise_rec_trainer(sess, model=rec, train=train, val=val, test=test,
+                    score = pairwise_rec_trainer(sess, model=rec, train=train, val=val, test=test,point_train=dummy_pair_data, 
                                         max_iters=self.max_iters, batch_size=2**self.batch_size,
                                         model_name=self.model_name, eps=eps, pow=pow, num=i)
                     results.append(score)
@@ -241,4 +264,5 @@ class Trainer:
             evaluator = Evaluator(train=train, val=val, test=test, model_name=self.model_name)
             evaluator.evaluate(eps=eps, pow=pow)     
         np.save(path / f'eps_{eps}.npy', arr=np.array(results).reshape((len(pow_list), iters)).T)
+
 

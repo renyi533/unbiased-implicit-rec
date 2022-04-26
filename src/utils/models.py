@@ -179,6 +179,7 @@ class PairwiseRecommender(AbstractRecommender):
         self.scores1 = tf.placeholder(tf.float32, [None, 1], name='score_ph')
         self.items2 = tf.placeholder(tf.int32, [None], name='item_ph2')
         self.scores2 = tf.placeholder(tf.float32, [None, 1], name='score_ph')
+        self.labels1 = tf.placeholder(tf.float32, [None, 1], name='label_ph1')
         self.labels2 = tf.placeholder(tf.float32, [None, 1], name='label_ph2')
         self.rel1 = tf.placeholder(tf.float32, [None, 1], name='rel_ph1')
         self.rel2 = tf.placeholder(tf.float32, [None, 1], name='rel_ph2')
@@ -213,7 +214,7 @@ class PairwiseRecommender(AbstractRecommender):
             local_losses = - self.rel1 * (1 - self.rel2) * tf.log(self.preds)
             self.ideal_loss = tf.reduce_sum(local_losses) / tf.reduce_sum(self.rel1 * (1 - self.rel2))
             # define the unbiased pairwise loss.
-            local_losses = - (1 / self.scores1) * (1 - (self.labels2 / self.scores2)) * tf.log(self.preds)
+            local_losses = - (self.labels1 / self.scores1) * (1 - (self.labels2 / self.scores2)) * tf.log(self.preds)
             # non-negative
             local_losses = tf.clip_by_value(local_losses, clip_value_min=-self.beta, clip_value_max=10e5)
             self.unbiased_loss = tf.reduce_mean(local_losses)
@@ -227,6 +228,7 @@ class PairwiseRecommender(AbstractRecommender):
     def add_optimizer(self) -> None:
         """Add the required optimiser to the graph."""
         with tf.name_scope('optimizer'):
+            self.apply_point_grads = None
             if self.optimizer == 'sgd':
                 self.apply_grads = tf.train.GradientDescentOptimizer(learning_rate=self.eta).minimize(self.loss)
             else:
@@ -298,11 +300,11 @@ class IPWPairwiseRecommender(PairwiseRecommender):
             local_losses = - self.rel1 * (1 - self.rel2) * tf.log(self.preds)
             self.ideal_loss = tf.reduce_sum(local_losses) / tf.reduce_sum(self.rel1 * (1 - self.rel2))
             # define the unbiased pairwise loss.
-            local_losses = - (1 / self.scores1) * ((1 - self.labels2) / self.scores2)  * tf.log(self.preds)
+            local_losses = - (self.labels1 / self.scores1) * ((1 - self.labels2) / self.scores2)  * tf.log(self.preds)
             numerator = (self.scores2 * tf.stop_gradient(self.preds))
             point_pos_preds = tf.stop_gradient(self.point_pos_preds)
             point_neg_preds = tf.stop_gradient(self.point_preds)
-            #point_pos_preds = tf.Print(point_pos_preds, [point_pos_preds, point_neg_preds, self.preds], 'point_pos_preds')
+            #point_pos_preds = tf.Print(point_pos_preds, [self.labels1, self.scores1, point_pos_preds, self.labels2, self.scores2, point_neg_preds, self.preds], 'point_pos_preds')
             denominator = numerator + (1 - self.scores2) * point_pos_preds
             #denominator = tf.Print(denominator, [numerator, denominator, numerator/denominator], 'denominator')
             local_losses = local_losses * numerator / denominator
@@ -320,18 +322,30 @@ class IPWPairwiseRecommender(PairwiseRecommender):
             local_losses *= weight
             # non-negative
             #local_losses = tf.clip_by_value(local_losses, clip_value_min=-self.beta, clip_value_max=10e5)
-            self.unbiased_loss = tf.reduce_mean(local_losses)
+            self.unbiased_loss = tf.reduce_sum(local_losses) / (tf.reduce_sum(self.labels1) + 1e-4)
 
-            local_ce = (self.labels2 / self.scores2) * tf.log(self.point_preds)
-            local_ce += (1 - self.labels2 / self.scores2) * tf.log(1. - self.point_preds)
+            local_ce = (self.labels1 / self.scores1) * tf.log(self.point_pos_preds)
+            local_ce += (1 - self.labels1 / self.scores1) * tf.log(1. - self.point_pos_preds)
             self.weighted_ce = - tf.reduce_mean(local_ce)
             
             reg_embeds = tf.nn.l2_loss(self.user_embeddings)
             reg_embeds += tf.nn.l2_loss(self.item_embeddings)
             reg_embeds += tf.nn.l2_loss(self.user_b)
             reg_embeds += tf.nn.l2_loss(self.item_b)
-            reg_embeds += tf.nn.l2_loss(self.point_user_embeddings)
-            reg_embeds += tf.nn.l2_loss(self.point_item_embeddings)
-            reg_embeds += tf.nn.l2_loss(self.point_user_b)
-            reg_embeds += tf.nn.l2_loss(self.point_item_b)
-            self.loss = self.unbiased_loss + self.lam * reg_embeds + self.weighted_ce
+            self.loss = self.unbiased_loss + self.lam * reg_embeds 
+            point_reg_embeds = tf.nn.l2_loss(self.point_user_embeddings)
+            point_reg_embeds += tf.nn.l2_loss(self.point_item_embeddings)
+            point_reg_embeds += tf.nn.l2_loss(self.point_user_b)
+            point_reg_embeds += tf.nn.l2_loss(self.point_item_b)
+            self.point_loss = self.weighted_ce + self.lam * point_reg_embeds
+            #self.loss = tf.Print(self.loss, [self.loss, self.unbiased_loss, self.point_loss, self.weighted_ce], 'loss')
+
+    def add_optimizer(self) -> None:
+        """Add the required optimiser to the graph."""
+        with tf.name_scope('optimizer'):
+            if self.optimizer == 'sgd':
+                self.apply_grads = tf.train.GradientDescentOptimizer(learning_rate=self.eta).minimize(self.loss)
+                self.apply_point_grads = tf.train.GradientDescentOptimizer(learning_rate=self.eta).minimize(self.point_loss)
+            else:
+                self.apply_grads = tf.train.AdamOptimizer(learning_rate=self.eta).minimize(self.loss)      
+                self.apply_point_grads = tf.train.AdamOptimizer(learning_rate=self.eta).minimize(self.point_loss)

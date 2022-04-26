@@ -32,7 +32,7 @@ def load_movielens(seed: int = 0) -> Tuple[np.array, int, int]:
     return data, num_users, num_items
 
 
-def generate_sys_data(eps: float = 5, pow: float = 0.5, enable_ips: bool = False, neg_num: int = 10) -> np.ndarray:
+def generate_sys_data(eps: float = 5, pow: float = 0.5, pair_type: int = 0, neg_num: int = 10) -> np.ndarray:
     """Generate semi-synthetic data from ml-100k dataset.
 
     return:
@@ -108,20 +108,42 @@ def generate_sys_data(eps: float = 5, pow: float = 0.5, enable_ips: bool = False
     sys_data = np.c_[data_, y_obs, expo_, y_, theta_, gamma_]
     np.save(file=path / f'eps_{eps}_pow_{pow}.npy', arr=sys_data)
     df = pd.DataFrame(sys_data, columns=['user', 'item', 'click', 'exposure', 'relevance', 'theta', 'gamma'])
-
+    column_cnt = 7
+    pair_column_cnt = column_cnt * 2 - 1
+    print('pointwise df size: %d, rows: %d' % (df.size, df.size / column_cnt))     
+   
+    print('pair_type %d' % pair_type)
     positive = df.query("click == 1")
-    negative = df if enable_ips else df.query("click == 0")
+    print('positive pointwise df size: %d, rows: %d' % (positive.size, positive.size / column_cnt))     
+    negative = df if pair_type > 0 else df.query("click == 0")
     ret = positive.merge(negative, on="user")\
         .sample(frac=1, random_state=12345)\
         .groupby(["user", "item_x"])\
         .head(neg_num)
+    print('pairwise df size: %d, rows: %d' % (ret.size, ret.size / pair_column_cnt))     
+
+    negative = df.query("click == 0")
+    print('negative pointwise df size: %d, rows: %d' % (negative.size, negative.size / column_cnt))     
+    dummy = df.groupby(["user"]).head(1)
+    print('dummy pointwise df size: %d, rows: %d' % (dummy.size, dummy.size / column_cnt))     
+    dummy_pair = df.merge(dummy, on="user")
+    print('dummy pairwise df size: %d, rows: %d' % (dummy_pair.size, dummy_pair.size / pair_column_cnt))     
+    #dummy_pair = dummy.merge(negative, on="user").sample(frac=1, random_state=12345)
+    #dummy_pair.rename(columns={'item_x':'item_y','item_y':'item_x', 'click_x':'click_y','click_y':'click_x'})
+    #dummy_pair.rename(columns={'exposure_x':'exposure_y','exposure_y':'exposure_x'})
+    #dummy_pair.rename(columns={'relevance_x':'relevance_y','relevance_y':'relevance_x'})
+    #dummy_pair.rename(columns={'theta_x':'theta_y','theta_y':'theta_x'})
+    #dummy_pair.rename(columns={'gamma_x':'gamma_y','gamma_y':'gamma_x'})
 
     sys_pair_data = ret[['user', 'item_x', 'item_y', 'click_x', 'click_y', 'exposure_x', 'exposure_y', 'relevance_x', 'relevance_y', 'theta_x', 'theta_y', 'gamma_x', 'gamma_y']].values
     np.save(file=path / f'pair_eps_{eps}_pow_{pow}.npy', arr=sys_pair_data)
-    return sys_data, sys_pair_data
+    dummy_pair_data = dummy_pair[['user', 'item_x', 'item_y', 'click_x', 'click_y', 'exposure_x', 'exposure_y', 'relevance_x', 'relevance_y', 'theta_x', 'theta_y', 'gamma_x', 'gamma_y']].values
+    np.save(file=path / f'dummy_pair_eps_{eps}_pow_{pow}.npy', arr=dummy_pair_data)
+    return sys_data, sys_pair_data, dummy_pair_data
 
 
 def sigmoid(x: np.ndarray) -> np.ndarray:
     """Calculate sigmoid."""
     return 1 / (1 + np.exp(-x))
+
 
