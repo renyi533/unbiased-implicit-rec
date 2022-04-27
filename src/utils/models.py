@@ -107,6 +107,7 @@ class ImplicitRecommender(AbstractRecommender):
         self.items = tf.placeholder(tf.int32, [None], name='item_placeholder')
         self.scores = tf.placeholder(tf.float32, [None, 1], name='score_placeholder')
         self.labels = tf.placeholder(tf.float32, [None, 1], name='label_placeholder')
+        self.gamma = tf.placeholder(tf.float32, [None, 1], name='gamma_ph')
 
     def build_graph(self) -> None:
         """Build the main tensorflow graph with embedding layers."""
@@ -138,6 +139,7 @@ class ImplicitRecommender(AbstractRecommender):
             # define the naive binary cross entropy loss.
             self.ce = - tf.reduce_mean(self.labels * tf.log(self.preds) + (1 - self.labels) * tf.log(1. - self.preds))
             # define the unbiased binary cross entropy loss in Eq. (9).
+            #self.preds = tf.Print(self.preds, [self.preds, self.labels, self.scores, self.gamma, self.logits, self.u_bias, self.i_bias, self.global_bias], 'pred, labels, scores, gamma, logits, u_bias, i_bias, global_bias')
             local_ce = (self.labels / self.scores) * tf.log(self.preds)
             local_ce += (1 - self.labels / self.scores) * tf.log(1. - self.preds)
             self.weighted_ce = - tf.reduce_mean(local_ce)
@@ -176,13 +178,15 @@ class PairwiseRecommender(AbstractRecommender):
         """Create the placeholders to be used."""
         self.users = tf.placeholder(tf.int32, [None], name='user_ph1')
         self.pos_items = tf.placeholder(tf.int32, [None], name='item_ph1')
-        self.scores1 = tf.placeholder(tf.float32, [None, 1], name='score_ph')
+        self.scores1 = tf.placeholder(tf.float32, [None, 1], name='score_ph1')
         self.items2 = tf.placeholder(tf.int32, [None], name='item_ph2')
-        self.scores2 = tf.placeholder(tf.float32, [None, 1], name='score_ph')
+        self.scores2 = tf.placeholder(tf.float32, [None, 1], name='score_ph2')
         self.labels1 = tf.placeholder(tf.float32, [None, 1], name='label_ph1')
         self.labels2 = tf.placeholder(tf.float32, [None, 1], name='label_ph2')
         self.rel1 = tf.placeholder(tf.float32, [None, 1], name='rel_ph1')
         self.rel2 = tf.placeholder(tf.float32, [None, 1], name='rel_ph2')
+        self.gamma1 = tf.placeholder(tf.float32, [None, 1], name='gamma_ph1')
+        self.gamma2 = tf.placeholder(tf.float32, [None, 1], name='gamma_ph2')
 
     def build_graph(self) -> None:
         """Build the main tensorflow graph with embedding layers."""
@@ -300,13 +304,22 @@ class IPWPairwiseRecommender(PairwiseRecommender):
             local_losses = - self.rel1 * (1 - self.rel2) * tf.log(self.preds)
             self.ideal_loss = tf.reduce_sum(local_losses) / tf.reduce_sum(self.rel1 * (1 - self.rel2))
             # define the unbiased pairwise loss.
-            local_losses = - (self.labels1 / self.scores1) * ((1 - self.labels2) / self.scores2)  * tf.log(self.preds)
-            numerator = (self.scores2 * tf.stop_gradient(self.preds))
             point_pos_preds = tf.stop_gradient(self.point_pos_preds)
             point_neg_preds = tf.stop_gradient(self.point_preds)
-            #point_pos_preds = tf.Print(point_pos_preds, [self.labels1, self.scores1, point_pos_preds, self.labels2, self.scores2, point_neg_preds, self.preds], 'point_pos_preds')
-            denominator = numerator + (1 - self.scores2) * point_pos_preds
-            #denominator = tf.Print(denominator, [numerator, denominator, numerator/denominator], 'denominator')
+            local_losses = - (self.labels1 / self.scores1) * ((1 - self.labels2) / self.scores2)  * tf.log(self.preds)
+            numerator = (self.scores2 * (1 - point_neg_preds))
+            denominator = 1.0 - point_neg_preds * self.scores2 + 1e-5
+            #numerator = (self.scores2 * (1 - self.gamma2))
+            #denominator = 1.0 - self.gamma2 * self.scores2 + 1e-5
+            self.scores2_minus = numerator / denominator
+            denominator = tf.Print(denominator, [numerator, denominator, self.scores2_minus], 'scores_minus')
+            #numerator = (self.scores2 * self.gamma1 * (1 - self.gamma2))
+            numerator = self.scores2_minus * point_pos_preds * (1 - point_neg_preds)
+            point_pos_preds = tf.Print(point_pos_preds, [self.labels1, self.scores1, self.labels2, self.scores2, self.scores2_minus], 'label_scores')
+            point_pos_preds = tf.Print(point_pos_preds, [ point_pos_preds,self.gamma1, point_neg_preds,self.gamma2,self.gamma1 * (1 - self.gamma2), self.preds], 'point_pos_preds')
+            denominator = numerator + (1 - self.scores2_minus) * point_pos_preds
+            denominator = tf.Print(denominator, [numerator, denominator, numerator / denominator], 'denominator')
+            #denominator = numerator + (1 - self.scores2) * self.gamma1
             local_losses = local_losses * numerator / denominator
             print('pair_weight: %d' % (self.pair_weight))
             print('norm_weight: %d' % (self.norm_weight))            
