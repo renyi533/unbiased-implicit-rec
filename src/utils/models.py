@@ -313,6 +313,7 @@ class IPWPairwiseRecommender(PairwiseRecommender):
                 print('use scores2 as scores2_minus')
                 self.scores2_minus = self.scores2
             numerator = (self.scores2_minus * tf.stop_gradient(self.preds))
+            numerator = (self.scores2_minus * point_pos_preds * (1 - point_neg_preds))
             #point_pos_preds = tf.Print(point_pos_preds, [point_pos_preds, point_neg_preds, self.preds], 'point_pos_preds')
             denominator = numerator + (1 - self.scores2_minus) * point_pos_preds
             #denominator = tf.Print(denominator, [numerator, denominator, numerator/denominator], 'denominator')
