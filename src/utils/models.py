@@ -295,31 +295,41 @@ class IPWPairwiseRecommender(PairwiseRecommender):
         """Create the losses."""
         with tf.name_scope('losses'):
             # define the naive pairwise loss.
+            print('pair_weight: %d' % (self.pair_weight))
+            print('norm_weight: %d' % (self.norm_weight))
             local_losses = - self.rel1 * (1 - self.rel2) * tf.log(self.preds)
             self.ideal_loss = tf.reduce_sum(local_losses) / tf.reduce_sum(self.rel1 * (1 - self.rel2))
             # define the unbiased pairwise loss.
-            local_losses = - (1 / self.scores1) * ((1 - self.labels2) / self.scores2)  * tf.log(self.preds)
-            numerator = (self.scores2 * tf.stop_gradient(self.preds))
+            weight = (1 / self.scores1) * ((1 - self.labels2) / self.scores2)
+            local_losses = -(weight * tf.log(self.preds))
             point_pos_preds = tf.stop_gradient(self.point_pos_preds)
             point_neg_preds = tf.stop_gradient(self.point_preds)
+            numerator = (self.scores2 * (1 - point_neg_preds))
+            denominator = 1.0 - point_neg_preds * self.scores2 + 1e-5
+            if self.pair_weight < 0:
+                print('compute scores2_minus')
+                self.scores2_minus = numerator / denominator
+            else:
+                print('use scores2 as scores2_minus')
+                self.scores2_minus = self.scores2
+            numerator = (self.scores2_minus * tf.stop_gradient(self.preds))
             #point_pos_preds = tf.Print(point_pos_preds, [point_pos_preds, point_neg_preds, self.preds], 'point_pos_preds')
-            denominator = numerator + (1 - self.scores2) * point_pos_preds
+            denominator = numerator + (1 - self.scores2_minus) * point_pos_preds
             #denominator = tf.Print(denominator, [numerator, denominator, numerator/denominator], 'denominator')
-            local_losses = local_losses * numerator / denominator
-            print('pair_weight: %d' % (self.pair_weight))
-            print('norm_weight: %d' % (self.norm_weight))            
-            weight = tf.ones_like(point_pos_preds, dtype = tf.float32) 
-            if self.pair_weight == 1:
-                weight = point_pos_preds
-            elif self.pair_weight == 2:
-                weight = point_pos_preds * (1 - point_neg_preds)   
+            local_losses *= numerator / denominator
+            self.pair_weight = abs(self.pair_weight)
+            weight = tf.ones_like(point_pos_preds, dtype=tf.float32)            
+            if self.pair_weight == 2:
+                weight *= point_pos_preds
+            elif self.pair_weight == 3:
+                weight *= point_pos_preds * (1 - point_neg_preds)   
             
             if self.norm_weight:
                 weight = weight / tf.reduce_mean(weight)
             #weight = tf.Print(weight, [weight], 'weight')
             local_losses *= weight
             # non-negative
-            #local_losses = tf.clip_by_value(local_losses, clip_value_min=-self.beta, clip_value_max=10e5)
+            local_losses = tf.clip_by_value(local_losses, clip_value_min=-self.beta, clip_value_max=10e5)
             self.unbiased_loss = tf.reduce_mean(local_losses)
 
             local_ce = (self.labels2 / self.scores2) * tf.log(self.point_preds)
